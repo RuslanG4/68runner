@@ -102,10 +102,7 @@ GAMELOOP:
     ;BSR     TIME
     BSR     INPUT                   ; Check Keyboard Input
     BSR     DRAW                    ; Draw the Scene  
-    SUB.L   #01,        ENEMY_Y      
-                 ; UPDATE
-    
-   ; MOVE.L (sp)+,d7
+    BSR     MOVE_ENEMY
 
               ; Loop back to GameLoop
 
@@ -140,33 +137,32 @@ INPUT:
 * Subroutine    : Process Input
 * Description   : Branch based on keys pressed
 *-----------------------------------------------------------
+MOVE_ENEMY:   
+    SUB.L   #06,     ENEMY_Y   
 
-UPDATE:
+    CLR.L D1
+    MOVE.L ENEMY_Y, D1
+    CMP.L   #02,     D1
+    BLT RESET_ENEMY_POSITION 
 
-    CMP.L   #00,        D1
-    BLE     RESET_ENEMY_POSITION    ; Reset Enemy if off Screen
-    BRA     MOVE_ENEMY              ; Move the Enemy
+    RTS  
 
-    RTS
- 
- 
- 
 RESET_ENEMY_POSITION:
     CLR.L   D2                      ; Clear contents of D1 (XOR is faster)
-    MOVE.L #452,D2
+    MOVE.L #600,D2
     MOVE.L D2, ENEMY_Y
     MOVE.L  ENEMY_Y,   D2          ; Y
 
+    RTS
+
     
-MOVE_ENEMY:   
-    SUB.L   #01,        ENEMY_Y      
-    RTS  
+
 
 MOVERIGHT:
-    ADD.L   #01,        PLAYER_X      
+    ADD.L   #03,        PLAYER_X      
     RTS  
 MOVELEFT:
-    SUB.L   #01,        PLAYER_X      
+    SUB.L   #03,        PLAYER_X      
     RTS     
 
 DRAW: 
