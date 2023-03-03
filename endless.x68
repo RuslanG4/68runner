@@ -93,18 +93,19 @@ INITIALISE:
 
 GAMELOOP:
 
-    MOVEQ #8,D0
+    MOVE.B #8,D0
     TRAP #15
-    MOVE.L D1,ELAPSED_TIME
+    MOVE.L D1,DELTA_TIME
 
-    MOVE.L D1,-(sp)
+    ;MOVE.L D1,-(sp)
     ; Main Gameloop
     ;BSR     TIME
     BSR     INPUT                   ; Check Keyboard Input
     BSR     DRAW                    ; Draw the Scene  
-    BSR     UPDATE                  ; UPDATE
+    SUB.L   #01,        ENEMY_Y      
+                 ; UPDATE
     
-    MOVE.L (sp)+,d7
+   ; MOVE.L (sp)+,d7
 
               ; Loop back to GameLoop
 
@@ -113,16 +114,13 @@ GAMELOOP:
 * Description   : Process Keyboard Input
 *-----------------------------------------------------------
 TIME:
-    MOVE.L ELAPSED_TIME,D1
-    ;MOVE.L START_TIME, D2
-    SUB.L   D2,D1
+   MOVE.B #8,D0
+   TRAP #15
+   SUB.L DELTA_TIME,D1
 
-    DIVU #100, D1
-    AND.L #$FFFF,   D1
-
-     BRA     GAMELOOP  
-
-    RTS
+   CMP.L #4,D1
+   BMI.S TIME ;IF RESULT IS NEGATIVE
+   BRA GAMELOOP
 
 INPUT:
     ; Process Input
@@ -136,6 +134,8 @@ INPUT:
     BEQ MOVELEFT
     CMP.W #$00FF,D1
     BEQ MOVERIGHT
+
+    RTS
 *-----------------------------------------------------------
 * Subroutine    : Process Input
 * Description   : Branch based on keys pressed
@@ -146,6 +146,8 @@ UPDATE:
     CMP.L   #00,        D1
     BLE     RESET_ENEMY_POSITION    ; Reset Enemy if off Screen
     BRA     MOVE_ENEMY              ; Move the Enemy
+
+    RTS
  
  
  
@@ -277,6 +279,7 @@ RED             EQU     $000000FF
 *
 *--------------------------------------------
 ELAPSED_TIME    DS.L    01
+DELTA_TIME      DS.L    01
 
 *-----------------------------------------------------------
 * Section       : Screen Size
