@@ -40,7 +40,7 @@ ENMY_H_INIT EQU         08          ; Enemy initial Height
 WALL_W_INIT EQU         30
 WALL_H_INIT EQU         100
 
-WALL_MOVE_SPEED EQU     01
+WALL_MOVE_SPEED EQU     03
 
 
 
@@ -81,7 +81,7 @@ INITIALISE:
 
     CLR.L D1
     MOVE.B #WALL_MOVE_SPEED,D1
-    MOVE D1,WALL_SPEED
+    MOVE.L D1,WALL_SPEED
 
 ;----------------------------------------------------------------------------
 ;----------------------|PLAYER|---------------------------------------------
@@ -320,8 +320,10 @@ UPDATE:
 ;----------------------|MOVES WALL 1|---------------------------------------------
 ;---------------------------------------------------------------------------
 MOVE_WALL_1:
-    SUB.L   #03,     WALL_1_X    
-    SUB.L   #03,     WALL_1_UP_X      
+    CLR.L D1
+    MOVE.L WALL_SPEED,D1
+    SUB.L   D1,     WALL_1_X    
+    SUB.L   D1,     WALL_1_UP_X      
     CLR.L D1
     MOVE.L WALL_1_X , D1
     CLR.L D2
@@ -353,8 +355,10 @@ RESET_WALL_1_POSITION:
 ;----------------------|MOVES WALL 2|---------------------------------------------
 ;---------------------------------------------------------------------------
 MOVE_WALL_2:
-    SUB.L   #03,     WALL_2_X    
-    SUB.L   #03,     WALL_2_UP_X      
+    CLR.L D1
+    MOVE.L WALL_SPEED,D1
+    SUB.L   D1,     WALL_2_X    
+    SUB.L   D1,     WALL_2_UP_X        
     CLR.L D1
     MOVE.L WALL_2_X , D1
     CLR.L D2
@@ -386,8 +390,10 @@ RESET_WALL_2_POSITION:
 ;----------------------|MOVES WALL 3|---------------------------------------------
 ;---------------------------------------------------------------------------
 MOVE_WALL_3:
-    SUB.L   #03,     WALL_3_X    
-    SUB.L   #03,     WALL_3_UP_X      
+    CLR.L D1
+    MOVE.L WALL_SPEED,D1
+    SUB.L   D1,     WALL_3_X    
+    SUB.L   D1,     WALL_3_UP_X       
     CLR.L D1
     MOVE.L WALL_3_X , D1
     CLR.L D2
@@ -414,7 +420,17 @@ RESET_WALL_3_POSITION:
     MOVE.L  WALL_3_X ,   D2          ; Y
     MOVE.L D3, WALL_3_UP_X 
     MOVE.L  WALL_3_UP_X ,   D3          ; Y
-    RTS        
+    BSR  INCREASE_SPEED
+    RTS  
+;----------------------------------------------------------------------------
+;----------------------|INCREASES GAME SPEED|---------------------------------------------
+;---------------------------------------------------------------------------
+INCREASE_SPEED:
+    CLR.L D1
+    MOVE.L WALL_SPEED  ,D1
+    ADD.L #01,D1
+    MOVE.L D1,WALL_SPEED  
+    RTS     
 ;----------------------------------------------------------------------------
 ;----------------------|PLAYER JUMP|---------------------------------------------
 ;--------------------------------------------------------------------------- 
