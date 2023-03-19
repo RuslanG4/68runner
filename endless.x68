@@ -27,8 +27,8 @@ TC_EXIT     EQU         09          ; Exit Trapcode
 * Description   : Size of Player and Enemy and properties
 * of these characters e.g Starting Positions and Sizes
 *-----------------------------------------------------------
-PLYR_W_INIT EQU         24          ; Players initial Width
-PLYR_H_INIT EQU         24          ; Players initial Height
+PLYR_W_INIT EQU         12          ; Players initial Width
+PLYR_H_INIT EQU         12          ; Players initial Height
 
 PLYR_DFLT_V EQU         00          ; Default Player Velocity
 PLYR_JUMP_V EQU        -10          ; Player Jump Velocity
@@ -39,6 +39,8 @@ ENMY_H_INIT EQU         08          ; Enemy initial Height
 
 WALL_W_INIT EQU         30
 WALL_H_INIT EQU         100
+
+WALL_MOVE_SPEED EQU     01
 
 
 
@@ -70,14 +72,16 @@ DOWN     EQU        $53       ;
 
 
 INITIALISE:
-
-    
 ;----------------------------------------------------------------------------
 ;----------------------|SCORE|---------------------------------------------
 ;---------------------------------------------------------------------------
     CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
     MOVE.L  #00,        D1          ; Init Score
     MOVE.L  D1,         PLAYER_SCORE
+
+    CLR.L D1
+    MOVE.B #WALL_MOVE_SPEED,D1
+    MOVE D1,WALL_SPEED
 
 ;----------------------------------------------------------------------------
 ;----------------------|PLAYER|---------------------------------------------
@@ -247,13 +251,16 @@ GAMELOOP:
     BSR     INPUT                   ; Check Keyboard Input
     BSR     DRAW                    ; Draw the Scene 
     BSR     UPDATE_SCORE            ;UPDATES PLAYER SCORE
-    BSR     CHECK_COLLISIONS        ;CHECKS COLL
     BSR     UPDATE                  ;UPDATES PLAYER WITH VELOCITY
     BSR     CHECK_GROUND            ;CHECKS IF PLAYER HITS THE GROUND
     BSR     CHECK_SKY               ;CHECKS IF PLAYER HITS THE TOP PLATFORM
+
     BSR     MOVE_WALL_1             ;MOVES FIRST SET OF WALLS
     BSR     MOVE_WALL_2             ;MOVES SECOND SET OF WALLS
     BSR     MOVE_WALL_3             ;MOVES THIRD SET OF WALLS
+
+    
+
    
   
  ;----------------------------------------------------------------------------
@@ -313,14 +320,20 @@ UPDATE:
 ;----------------------|MOVES WALL 1|---------------------------------------------
 ;---------------------------------------------------------------------------
 MOVE_WALL_1:
-    SUB.L   #06,     WALL_1_X    
-    SUB.L   #06,     WALL_1_UP_X      
+    SUB.L   #03,     WALL_1_X    
+    SUB.L   #03,     WALL_1_UP_X      
     CLR.L D1
     MOVE.L WALL_1_X , D1
     CLR.L D2
     SUB.L #40, D2
     CMP.L   D2,     D1
     BLT RESET_WALL_1_POSITION 
+    BSR     CHECK_COLLISIONS        ;CHECKS COLL
+    BSR     CHECK_UP_COLLISIONS
+    BSR     CHECK_COLLISIONS_2
+    BSR     CHECK_UP_COLLISIONS_2
+    BSR     CHECK_COLLISIONS_3
+    BSR     CHECK_UP_COLLISIONS_3
     RTS
  
 ;----------------------------------------------------------------------------
@@ -340,14 +353,20 @@ RESET_WALL_1_POSITION:
 ;----------------------|MOVES WALL 2|---------------------------------------------
 ;---------------------------------------------------------------------------
 MOVE_WALL_2:
-    SUB.L   #06,     WALL_2_X    
-    SUB.L   #06,     WALL_2_UP_X      
+    SUB.L   #03,     WALL_2_X    
+    SUB.L   #03,     WALL_2_UP_X      
     CLR.L D1
     MOVE.L WALL_2_X , D1
     CLR.L D2
     SUB.L #40, D2
     CMP.L   D2,     D1
     BLT RESET_WALL_2_POSITION 
+    BSR     CHECK_COLLISIONS        ;CHECKS COLL
+    BSR     CHECK_UP_COLLISIONS
+    BSR     CHECK_COLLISIONS_2
+    BSR     CHECK_UP_COLLISIONS_2
+    BSR     CHECK_COLLISIONS_3
+    BSR     CHECK_UP_COLLISIONS_3
     RTS
  
 ;----------------------------------------------------------------------------
@@ -367,14 +386,20 @@ RESET_WALL_2_POSITION:
 ;----------------------|MOVES WALL 3|---------------------------------------------
 ;---------------------------------------------------------------------------
 MOVE_WALL_3:
-    SUB.L   #06,     WALL_3_X    
-    SUB.L   #06,     WALL_3_UP_X      
+    SUB.L   #03,     WALL_3_X    
+    SUB.L   #03,     WALL_3_UP_X      
     CLR.L D1
     MOVE.L WALL_3_X , D1
     CLR.L D2
     SUB.L #40, D2
     CMP.L   D2,     D1
     BLT RESET_WALL_3_POSITION 
+    BSR     CHECK_COLLISIONS        ;CHECKS COLL
+    BSR     CHECK_UP_COLLISIONS
+    BSR     CHECK_COLLISIONS_2
+    BSR     CHECK_UP_COLLISIONS_2
+    BSR     CHECK_COLLISIONS_3
+    BSR     CHECK_UP_COLLISIONS_3
     RTS
  
 ;----------------------------------------------------------------------------
@@ -410,7 +435,7 @@ CHECK_GROUND:
 ;----------------------|CHECKS IF PLAYER HITS CEILING|---------------------------------------------
 ;---------------------------------------------------------------------------   
 CHECK_SKY:
- CLR.L D1
+    CLR.L D1
     MOVE.L PLAYER_Y , D1
     MOVE.L #50,D2
     CMP.L   D2,      D1
@@ -420,7 +445,7 @@ CHECK_SKY:
 ;----------------------|END GAME |---------------------------------------------
 ;---------------------------------------------------------------------------
 DIE:
-    SIMHALT
+    BRA INITIALISE
 
 ;----------------------------------------------------------------------------
 ;----------------------|DRAWS GAME|---------------------------------------------
@@ -678,41 +703,216 @@ DRAW_WALL_3_UP:
 ;----------------------|CEHCKS COLLISION WITH BOTTOM WALL 1|---------------------------------------------
 ;----------------------------------------------------------------------------------------------------
 CHECK_COLLISIONS:
-    CLR.L   D1                      ; Clear D1
-    CLR.L   D2                      ; Clear D2
-PLAYER_X_LTE_TO_ENEMY_X_PLUS_W:
-    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
+    ; Check collision for a single coin
+    ; PLAYER_X <= COIN_X + COIN_W &&
+    ; PLAYER_X + PLAYER_W >= COIN_X &&
+    ; PLAYER_Y <= COIN_Y + COIN_H &&
+    ; PLAYER_H + PLAYER_Y >= COIN_Y
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_1_X,    D2          ; Move Enemy X to D2
     ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1,         D2          ; Do the Overlap ?
-    BLE     PLAYER_X_PLUS_W_LTE_TO_ENEMY_X  ; Less than or Equal ?
-    BRA     COLLISION_CHECK_DONE    ; If not no collision
-PLAYER_X_PLUS_W_LTE_TO_ENEMY_X:     ; Check player is not  
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     X_GREATER  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+X_GREATER:
+    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
     ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
-    MOVE.L  WALL_1_X,    D2          ; Move Enemy X to D2
-    CMP.L   D2,         D1          ; Do they OverLap ?
-    BGE     PLAYER_Y_LTE_TO_ENEMY_Y_PLUS_H  ; Less than or Equal
-    BRA     COLLISION_CHECK_DONE    ; If not no collision   
-PLAYER_Y_LTE_TO_ENEMY_Y_PLUS_H:     
+    MOVE.L  WALL_1_X,   D2          ; Move Enemy X to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     Y_LESS  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_LESS:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    MOVE.L  WALL_1_Y,    D2          ; Move Enemy Y to D2
-    ADD.L   WALL_H_INIT,D2          ; Set Enemy Height to D2
-    CMP.L   D1,         D2          ; Do they Overlap ?
-    BLE     PLAYER_Y_PLUS_H_LTE_TO_ENEMY_Y  ; Less than or Equal
-    BRA     COLLISION_CHECK_DONE    ; If not no collision 
-PLAYER_Y_PLUS_H_LTE_TO_ENEMY_Y:     ; Less than or Equal ?
+    MOVE.L  WALL_1_Y,    D2         ; Move Enemy Y to D2
+    ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
+    CMP.L   D2, D2                ; Check if there's overlap on Y axis
+    BLE     Y_GREATER  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_GREATER:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
-    MOVE.L  WALL_1_Y,    D2          ; Move Enemy Height to D2  
-    CMP.L   D2,         D1          ; Do they OverLap ?
-    BGE     COLLISION               ; Collision !
-    BRA     COLLISION_CHECK_DONE    ; If not no collision
+    MOVE.L  WALL_1_Y,    D2         ; Move Enemy Height to D2  
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BGE     COLLISION  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+;------------------------------------------------------------------------------------------------------
+;----------------------|CEHCKS COLLISION WITH TOP WALL 1|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+CHECK_UP_COLLISIONS:
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  WALL_1_UP_X,    D2          ; Move Enemy X to D2
+    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     X_GREATER_Y  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+X_GREATER_Y:
+    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
+    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    MOVE.L  WALL_1_UP_X,   D2          ; Move Enemy X to D2
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
+    BGE     Y_LESS_Y  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_LESS_Y:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    MOVE.L  WALL_1_UP_Y,    D2         ; Move Enemy Y to D2
+    ADD.L   #90,D2          ; Set Enemy Height to D2
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BLE     Y_GREATER_Y  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_GREATER_Y:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    MOVE.L  WALL_1_UP_Y,    D2         ; Move Enemy Height to D2  
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BGE     COLLISION  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+
+;------------------------------------------------------------------------------------------------------
+;----------------------|CEHCKS COLLISION WITH BOTTOM WALL 2|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+CHECK_COLLISIONS_2:
+    ; Check collision for a single coin
+    ; PLAYER_X <= COIN_X + COIN_W &&
+    ; PLAYER_X + PLAYER_W >= COIN_X &&
+    ; PLAYER_Y <= COIN_Y + COIN_H &&
+    ; PLAYER_H + PLAYER_Y >= COIN_Y
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  WALL_2_X,    D2          ; Move Enemy X to D2
+    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     X_GREATER_2  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+X_GREATER_2:
+    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
+    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    MOVE.L  WALL_2_X,   D2          ; Move Enemy X to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     Y_LESS_2  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_LESS_2:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    MOVE.L  WALL_2_Y,    D2         ; Move Enemy Y to D2
+    ADD.L   #200,D2          ; Set Enemy Height to D2
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BLE     Y_GREATER_2  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_GREATER_2:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    MOVE.L  WALL_2_Y,    D2         ; Move Enemy Height to D2  
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BGE     COLLISION  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+
+;------------------------------------------------------------------------------------------------------
+;----------------------|CEHCKS COLLISION WITH TOP WALL 2|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+CHECK_UP_COLLISIONS_2:
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  WALL_2_UP_X,    D2          ; Move Enemy X to D2
+    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     X_GREATER_Y_2  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+X_GREATER_Y_2:
+    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
+    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    MOVE.L  WALL_2_UP_X,   D2          ; Move Enemy X to D2
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
+    BGE     Y_LESS_Y_2  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_LESS_Y_2:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    MOVE.L  WALL_2_UP_Y,    D2         ; Move Enemy Y to D2
+    ADD.L   #80,D2          ; Set Enemy Height to D2
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BLE     Y_GREATER_Y_2  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_GREATER_Y_2:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    MOVE.L  WALL_2_UP_Y,    D2         ; Move Enemy Height to D2  
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BGE     COLLISION  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+
+;------------------------------------------------------------------------------------------------------
+;----------------------|CEHCKS COLLISION WITH BOTTOM WALL 3|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+CHECK_COLLISIONS_3:
+    ; Check collision for a single coin
+    ; PLAYER_X <= COIN_X + COIN_W &&
+    ; PLAYER_X + PLAYER_W >= COIN_X &&
+    ; PLAYER_Y <= COIN_Y + COIN_H &&
+    ; PLAYER_H + PLAYER_Y >= COIN_Y
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  WALL_3_X,    D2          ; Move Enemy X to D2
+    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     X_GREATER_3  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+X_GREATER_3:
+    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
+    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    MOVE.L  WALL_3_X,   D2          ; Move Enemy X to D2
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BGE     Y_LESS_3  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_LESS_3:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    MOVE.L  WALL_3_Y,    D2         ; Move Enemy Y to D2
+    ADD.L   #75,D2          ; Set Enemy Height to D2
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BLE     Y_GREATER_3  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_GREATER_3:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    MOVE.L  WALL_3_Y,    D2         ; Move Enemy Height to D2  
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BGE     COLLISION  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+;------------------------------------------------------------------------------------------------------
+;----------------------|CEHCKS COLLISION WITH TOP WALL 3|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+CHECK_UP_COLLISIONS_3:
+    MOVE.L  PLAYER_X, D1          ; Move player X to D1
+    MOVE.L  WALL_3_UP_X,    D2          ; Move Enemy X to D2
+    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    BLE     X_GREATER_Y_3  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+X_GREATER_Y_3:
+    MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
+    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    MOVE.L  WALL_3_UP_X,   D2          ; Move Enemy X to D2
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
+    BGE     Y_LESS_Y_3  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_LESS_Y_3:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    MOVE.L  WALL_3_UP_Y,    D2         ; Move Enemy Y to D2
+    ADD.L   #190,D2          ; Set Enemy Height to D2
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BLE     Y_GREATER_Y_3  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE
+Y_GREATER_Y_3:
+    MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
+    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    MOVE.L  WALL_3_UP_Y,    D2         ; Move Enemy Height to D2  
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
+    BGE     COLLISION  ; If no overlap, skip to next coin
+    BRA     COLLISION_CHECK_DONE    
 COLLISION_CHECK_DONE:               ; No Collision Update points
    
     RTS                             ; Return to subroutine
 
 COLLISION:
-   SIMHALT
-   RTS
+   BRA INITIALISE
+
+
+
+
 
 
 
@@ -817,6 +1017,8 @@ WALL_3_Y        DS.L 01
 
 WALL_3_UP_X     DS.L 01
 WALL_3_UP_Y     DS.L 01
+
+WALL_SPEED      DS.L 01
 
 
 
