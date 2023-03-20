@@ -42,6 +42,9 @@ WALL_H_INIT EQU         400
 
 WALL_MOVE_SPEED EQU     03
 
+JETPACK_INDEX   EQU         00          ; Player Jump Sound Index  
+GAME_OVER_INDEX EQU         01
+
 
 
 *-----------------------------------------------------------
@@ -86,6 +89,12 @@ INITIALISE:
     CLR.L D1
     MOVE.B #WALL_MOVE_SPEED,D1
     MOVE.L D1,WALL_SPEED
+
+
+     ; Initialise Sounds
+    BSR    JETPACK_LOAD                ; Load JETPACK Sound into Memory
+    BSR    GAME_OVER_LOAD
+ 
 
 ;----------------------------------------------------------------------------
 ;----------------------|PLAYER|---------------------------------------------
@@ -483,6 +492,7 @@ INCREASE_SPEED:
 ;--------------------------------------------------------------------------- 
 JUMP:
     MOVE.L  #PLYR_JUMP_V,PLYR_VELOCITY
+    BSR PLAY_JETPACK
 
 ;----------------------------------------------------------------------------
 ;----------------------|CHECKS IF PLAYER HITS THE GROUND|---------------------------------------------
@@ -508,6 +518,7 @@ CHECK_SKY:
 ;----------------------|END GAME |---------------------------------------------
 ;---------------------------------------------------------------------------
 DIE:
+    BSR PLAY_GAME_OVER
     BRA INITIALISE
 
 ;----------------------------------------------------------------------------
@@ -1008,9 +1019,12 @@ COLLISION_CHECK_DONE:               ; No Collision Update points
     RTS                             ; Return to subroutine
 
 COLLISION:
+   BSR PLAY_GAME_OVER
    BRA INITIALISE
    RTS
-
+;------------------------------------------------------------------------------------------------------
+;----------------------|random number genertaor|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
 RANDOM_NUMBER:     
     MOVE.B #8, D0 ;#Loads D1 with Time in 100's of Seconds since midnight (6 Bits)
 
@@ -1031,7 +1045,34 @@ RANDOM_NUMBER:
     MOVE.W D2, D1 ;#Move the generated number to D1
     RTS
 
-
+;------------------------------------------------------------------------------------------------------
+;----------------------|jump sound|---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+JETPACK_LOAD:
+    LEA     JETPACK_WAV,   A1          ; Load Wav File into A1
+    MOVE    #JETPACK_INDEX, D1          ; Assign it INDEX
+    MOVE    #71,        D0          ; Load into memory
+    TRAP    #15                     ; Trap (Perform action)
+    RTS    
+PLAY_JETPACK:
+    MOVE    #JETPACK_INDEX, D1          ; Load Sound INDEX
+    MOVE    #72,        D0          ; Play Sound
+    TRAP    #15                     ; Trap (Perform action)
+    RTS   
+;------------------------------------------------------------------------------------------------------
+;----------------------|game over sound |---------------------------------------------
+;----------------------------------------------------------------------------------------------------
+GAME_OVER_LOAD:
+    LEA     GAME_OVER_WAV,   A1          ; Load Wav File into A1
+    MOVE    #GAME_OVER_INDEX, D1          ; Assign it INDEX
+    MOVE    #71,        D0          ; Load into memory
+    TRAP    #15                     ; Trap (Perform action)
+    RTS    
+PLAY_GAME_OVER:
+    MOVE    #GAME_OVER_INDEX, D1          ; Load Sound INDEX
+    MOVE    #72,        D0          ; Play Sound
+    TRAP    #15                     ; Trap (Perform action)
+    RTS  
 
 
 EXIT:
@@ -1176,9 +1217,9 @@ WALL_SPEED      DS.L 01
 * so keep the files small. Used https://voicemaker.in/ to 
 * generate and Audacity to convert MP3 to WAV
 *-----------------------------------------------------------
-JUMP_WAV        DC.B    'jump.wav',0        ; Jump Sound
-RUN_WAV         DC.B    'run.wav',0         ; Run Sound
-OPPS_WAV        DC.B    'opps.wav',0        ; Collision Opps
+JETPACK_WAV        DC.B    'jumpOne.wav',0        ; Jump Sound
+GAME_OVER_WAV      DC.B    'gameOver.wav',0      ;gameover soound
+
 
 
     END    START        ; last line of source
