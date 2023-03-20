@@ -38,7 +38,7 @@ ENMY_W_INIT EQU         640        ; Enemy initial Width
 ENMY_H_INIT EQU         08          ; Enemy initial Height
 
 WALL_W_INIT EQU         30
-WALL_H_INIT EQU         100
+WALL_H_INIT EQU         400
 
 WALL_MOVE_SPEED EQU     03
 
@@ -79,6 +79,10 @@ INITIALISE:
     MOVE.L  #00,        D1          ; Init Score
     MOVE.L  D1,         PLAYER_SCORE
 
+    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    MOVE.L  #00,        D1          ; Init Score
+    MOVE.L  D1,         PLAYER_METERS
+
     CLR.L D1
     MOVE.B #WALL_MOVE_SPEED,D1
     MOVE.L D1,WALL_SPEED
@@ -107,6 +111,18 @@ INITIALISE:
     MOVE.L #102,D2
     MOVE.L D2, PLAYER_Y
     MOVE.L  PLAYER_Y,   D2          ; Y
+
+    ; JETPACK X
+    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    MOVE.L #40,D1
+    MOVE.L D1, JETPACK_X
+    MOVE.L  JETPACK_X,   D1          ; X
+
+      ; JETPACK Y
+    CLR.L   D1                      ; Clear contents of D1 (XOR is faster)
+    MOVE.L #102,D1
+    MOVE.L D1, JETPACK_Y
+    MOVE.L  JETPACK_Y,   D1          ; X
 ;----------------------------------------------------------------------------
 ;----------------------|BOTTOM PLATFORM|---------------------------------------------
 ;---------------------------------------------------------------------------
@@ -163,8 +179,9 @@ INITIALISE:
      MOVE.L  WALL_1_UP_X,   D2          ; Y
 
       ; WALL_1_UP Y
-     CLR.L   D2                      ; Clear contents of D1 (XOR is faster)
-     MOVE.L #65,D2
+      CLR.L   D2                      ; Clear contents of D1 (XOR is faster)
+     MOVE.L WALL_1_Y,D2
+     SUB.L #500,D2
      MOVE.L D2, WALL_1_UP_Y
      MOVE.L  WALL_1_UP_Y,   D2          ; Y
 ;----------------------------------------------------------------------------
@@ -191,7 +208,8 @@ INITIALISE:
 
       ; WALL_2_UP Y
      CLR.L   D2                      ; Clear contents of D1 (XOR is faster)
-     MOVE.L #65,D2
+     MOVE.L WALL_2_Y,D2
+     SUB.L #500,D2
      MOVE.L D2, WALL_2_UP_Y
      MOVE.L  WALL_2_UP_Y,   D2          ; Y
 
@@ -217,8 +235,9 @@ INITIALISE:
      MOVE.L  WALL_3_UP_X,   D2          ; Y
 
       ; WALL_3_UP Y
-     CLR.L   D2                      ; Clear contents of D1 (XOR is faster)
-     MOVE.L #65,D2
+      CLR.L   D2                      ; Clear contents of D1 (XOR is faster)
+     MOVE.L WALL_3_Y,D2
+     SUB.L #500,D2
      MOVE.L D2, WALL_3_UP_Y
      MOVE.L  WALL_3_UP_Y,   D2          ; Y
 
@@ -250,14 +269,21 @@ GAMELOOP:
     ;BSR     TIME
     BSR     INPUT                   ; Check Keyboard Input
     BSR     DRAW                    ; Draw the Scene 
-    BSR     UPDATE_SCORE            ;UPDATES PLAYER SCORE
+    BSR     UPDATE_METERS            ;UPDATES PLAYER SCORE
     BSR     UPDATE                  ;UPDATES PLAYER WITH VELOCITY
+    BSR     UPDATE_JETPACK
     BSR     CHECK_GROUND            ;CHECKS IF PLAYER HITS THE GROUND
     BSR     CHECK_SKY               ;CHECKS IF PLAYER HITS THE TOP PLATFORM
 
     BSR     MOVE_WALL_1             ;MOVES FIRST SET OF WALLS
     BSR     MOVE_WALL_2             ;MOVES SECOND SET OF WALLS
     BSR     MOVE_WALL_3             ;MOVES THIRD SET OF WALLS
+    BSR     CHECK_COLLISIONS        ;CHECKS COLL
+    BSR     CHECK_UP_COLLISIONS
+    BSR     CHECK_COLLISIONS_2
+    BSR     CHECK_UP_COLLISIONS_2
+    BSR     CHECK_COLLISIONS_3
+    BSR     CHECK_UP_COLLISIONS_3
 
     
 
@@ -297,8 +323,8 @@ INPUT:
 ;----------------------------------------------------------------------------
 ;----------------------|UPDATES SCORE|---------------------------------------------
 ;---------------------------------------------------------------------------
-UPDATE_SCORE:
-    ADD.L   #01,     PLAYER_SCORE
+UPDATE_METERS:
+    ADD.L   #01,     PLAYER_METERS
     RTS
 
 ;-----------------------------------------------------------------------------------------------------------------
@@ -316,6 +342,17 @@ UPDATE:
  
 
     RTS
+
+UPDATE_JETPACK:
+    CLR.L D1
+    MOVE.L PLAYER_X,D1
+    SUB.L #6,D1
+    MOVE.L D1, JETPACK_X
+
+    MOVE.L PLAYER_Y,D1
+    MOVE.L D1, JETPACK_Y
+    RTS
+
 ;----------------------------------------------------------------------------
 ;----------------------|MOVES WALL 1|---------------------------------------------
 ;---------------------------------------------------------------------------
@@ -330,12 +367,6 @@ MOVE_WALL_1:
     SUB.L #40, D2
     CMP.L   D2,     D1
     BLT RESET_WALL_1_POSITION 
-    BSR     CHECK_COLLISIONS        ;CHECKS COLL
-    BSR     CHECK_UP_COLLISIONS
-    BSR     CHECK_COLLISIONS_2
-    BSR     CHECK_UP_COLLISIONS_2
-    BSR     CHECK_COLLISIONS_3
-    BSR     CHECK_UP_COLLISIONS_3
     RTS
  
 ;----------------------------------------------------------------------------
@@ -350,7 +381,18 @@ RESET_WALL_1_POSITION:
     MOVE.L  WALL_1_X ,   D2          ; Y
     MOVE.L D3, WALL_1_UP_X 
     MOVE.L  WALL_1_UP_X ,   D3          ; Y
-    RTS
+
+    BSR RANDOM_NUMBER
+    MOVE.L D2 , WALL_1_Y
+    MOVE.L WALL_1_Y , D2
+    CLR.L D1
+    MOVE.L WALL_1_Y,D1
+    SUB.L #500,D1
+    MOVE.L D1,WALL_1_UP_Y
+    MOVE.L WALL_1_UP_Y,D1
+
+    ADD.L   #01,     PLAYER_SCORE
+    RTS    
 ;----------------------------------------------------------------------------
 ;----------------------|MOVES WALL 2|---------------------------------------------
 ;---------------------------------------------------------------------------
@@ -365,12 +407,6 @@ MOVE_WALL_2:
     SUB.L #40, D2
     CMP.L   D2,     D1
     BLT RESET_WALL_2_POSITION 
-    BSR     CHECK_COLLISIONS        ;CHECKS COLL
-    BSR     CHECK_UP_COLLISIONS
-    BSR     CHECK_COLLISIONS_2
-    BSR     CHECK_UP_COLLISIONS_2
-    BSR     CHECK_COLLISIONS_3
-    BSR     CHECK_UP_COLLISIONS_3
     RTS
  
 ;----------------------------------------------------------------------------
@@ -385,6 +421,20 @@ RESET_WALL_2_POSITION:
     MOVE.L  WALL_2_X ,   D2          ; Y
     MOVE.L D3, WALL_2_UP_X 
     MOVE.L  WALL_2_UP_X ,   D3          ; Y
+
+    CLR.L D2                      ; Clear contents of D1 (XOR is faster)
+    CLR.L D3
+    BSR RANDOM_NUMBER
+    MOVE.L D2 , WALL_2_Y
+    MOVE.L WALL_2_Y , D2
+    CLR.L D1
+    MOVE.L WALL_2_Y,D1
+    SUB.L #500,D1
+    MOVE.L D1,WALL_2_UP_Y
+    MOVE.L WALL_2_UP_Y,D1
+
+    ADD.L   #01,     PLAYER_SCORE
+
     RTS    
 ;----------------------------------------------------------------------------
 ;----------------------|MOVES WALL 3|---------------------------------------------
@@ -400,12 +450,6 @@ MOVE_WALL_3:
     SUB.L #40, D2
     CMP.L   D2,     D1
     BLT RESET_WALL_3_POSITION 
-    BSR     CHECK_COLLISIONS        ;CHECKS COLL
-    BSR     CHECK_UP_COLLISIONS
-    BSR     CHECK_COLLISIONS_2
-    BSR     CHECK_UP_COLLISIONS_2
-    BSR     CHECK_COLLISIONS_3
-    BSR     CHECK_UP_COLLISIONS_3
     RTS
  
 ;----------------------------------------------------------------------------
@@ -421,6 +465,9 @@ RESET_WALL_3_POSITION:
     MOVE.L D3, WALL_3_UP_X 
     MOVE.L  WALL_3_UP_X ,   D3          ; Y
     BSR  INCREASE_SPEED
+
+    ADD.L   #01,     PLAYER_SCORE
+
     RTS  
 ;----------------------------------------------------------------------------
 ;----------------------|INCREASES GAME SPEED|---------------------------------------------
@@ -476,8 +523,8 @@ DRAW:
 	MOVE.W	#$FF00,     D1          ; Clear contents
 	TRAP    #15                     ; Trap (Perform action)
 
-    BSR     DRAW_PLYR_DATA          ; Draw Draw Score, HUD, Player X and Y
     BSR     DRAW_PLAYER             ; Draw Player
+    BSR     DRAW_JETPACK
     BSR     DRAW_PLAT_1             ; bottom platform
     BSR     DRAW_PLAT_2              ;draw top platform
     BSR     DRAW_WALL_1             ;draw bottom pipe
@@ -486,6 +533,7 @@ DRAW:
     BSR     DRAW_WALL_2_UP          ;DRAW TOP WALL OF 2
     BSR     DRAW_WALL_3             ;BOTTOM OF WALL 3
     BSR     DRAW_WALL_3_UP          ;TOP OF WALL 3
+    BSR     DRAW_PLYR_DATA          ; Draw Draw Score, HUD, Player X and Y
 
    
     RTS                             ; Return to subroutine
@@ -499,7 +547,7 @@ DRAW_PLYR_DATA:
     MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
     MOVE.W  #$0201,     D1          ; Col 02, Row 01
     TRAP    #15                     ; Trap (Perform action)
-    LEA     SCORE_MSG,  A1          ; Score Message
+    LEA     METERS_MSG,  A1          ; Score Message
     MOVE    #13,        D0          ; No Line feed
     TRAP    #15                     ; Trap (Perform action)
 
@@ -507,8 +555,23 @@ DRAW_PLYR_DATA:
     MOVE.W  #$0901,     D1          ; Col 09, Row 01
     TRAP    #15                     ; Trap (Perform action)
     MOVE.B  #03,        D0          ; Display number at D1.L
+    MOVE.L  PLAYER_METERS,D1         ; Move Score to D1.L
+    TRAP    #15                     ; Trap (Perform action)
+
+    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
+    MOVE.W  #$0202,     D1          ; Col 02, Row 01
+    TRAP    #15                     ; Trap (Perform action)
+    LEA     SCORE_MSG,  A1          ; Score Message
+    MOVE    #13,        D0          ; No Line feed
+    TRAP    #15                     ; Trap (Perform action)
+
+    MOVE.B  #TC_CURSR_P,D0          ; Set Cursor Position
+    MOVE.W  #$0902,     D1          ; Col 09, Row 01
+    TRAP    #15                     ; Trap (Perform action)
+    MOVE.B  #03,        D0          ; Display number at D1.L
     MOVE.L  PLAYER_SCORE,D1         ; Move Score to D1.L
     TRAP    #15                     ; Trap (Perform action)
+    
     RTS
 ;-----------------------------------------------------------------------------------
 ;----------------------|DRAWS PLAYER |---------------------------------------------
@@ -537,6 +600,27 @@ DRAW_PLAYER:
 
         
 
+DRAW_JETPACK:
+ ; Set Pixel Colors
+    MOVE.L  #WHITE,     D1          ; Set Background color
+    MOVE.B  #80,        D0          ; Task for Background Color
+    TRAP    #15                     ; Trap (Perform action)
+
+    ; Set X, Y, Width and Height
+
+    MOVE.L  JETPACK_X,   D1          ; X
+
+    MOVE.L  JETPACK_Y,   D2          ; Y
+    
+    MOVE.L  JETPACK_X,   D3
+    ADD.L   #6,   D3      ; Width
+    MOVE.L  JETPACK_Y,   D4 
+    ADD.L   #10,   D4      ; Height
+    
+    ; Draw Player
+    MOVE.B  #87,        D0          ; Draw Player
+    TRAP    #15                     ; Trap (Perform action)
+    RTS                             ; Return to subroutine
 
 ;-----------------------------------------------------------------------------------
 ;----------------------|DRAWS PLATFORM 1|---------------------------------------------
@@ -600,7 +684,7 @@ DRAW_WALL_1:
     MOVE.L WALL_1_X,   D3
     ADD.L   #WALL_W_INIT,   D3      ; Width
     MOVE.L  WALL_1_Y,   D4 
-    ADD.L   #125,   D4      ; Height
+    ADD.L   #WALL_H_INIT,   D4      ; Height
     
     ; Draw ENEMY
     MOVE.B  #87,        D0          ; Draw wall
@@ -622,7 +706,7 @@ DRAW_WALL_1_UP:
     MOVE.L WALL_1_UP_X,   D3
     ADD.L   #WALL_W_INIT,   D3      ; Width
     MOVE.L  WALL_1_UP_Y,   D4 
-    ADD.L   #125,   D4      ; Height
+    ADD.L   #WALL_H_INIT,   D4      ; Height
     
     ; Draw ENEMY
     MOVE.B  #87,        D0          ; Draw wall
@@ -643,7 +727,7 @@ DRAW_WALL_2:
     MOVE.L WALL_2_X,   D3
     ADD.L   #WALL_W_INIT,   D3      ; Width
     MOVE.L  WALL_2_Y,   D4 
-    ADD.L   #200,   D4      ; Height
+    ADD.L   #WALL_H_INIT,   D4      ; Height
     
     ; Draw ENEMY
     MOVE.B  #87,        D0          ; Draw wall
@@ -685,7 +769,7 @@ DRAW_WALL_3:
     MOVE.L WALL_3_X,   D3
     ADD.L   #WALL_W_INIT,   D3      ; Width
     MOVE.L  WALL_3_Y,   D4 
-    ADD.L   #75,   D4      ; Height
+    ADD.L   #WALL_H_INIT,   D4      ; Height
     
     ; Draw ENEMY
     MOVE.B  #87,        D0          ; Draw wall
@@ -706,7 +790,7 @@ DRAW_WALL_3_UP:
     MOVE.L WALL_3_UP_X,   D3
     ADD.L   #WALL_W_INIT,   D3      ; Width
     MOVE.L  WALL_3_UP_Y,   D4 
-    ADD.L   #200,   D4      ; Height
+    ADD.L   #WALL_H_INIT,   D4      ; Height
     
     ; Draw ENEMY
     MOVE.B  #87,        D0          ; Draw wall
@@ -726,27 +810,27 @@ CHECK_COLLISIONS:
     ; PLAYER_H + PLAYER_Y >= COIN_Y
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_1_X,    D2          ; Move Enemy X to D2
-    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    ADD.L   #WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BLE     X_GREATER  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 X_GREATER:
     MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    ADD.L   #PLYR_W_INIT,D1          ; Move Player Width to D1
     MOVE.L  WALL_1_X,   D2          ; Move Enemy X to D2
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BGE     Y_LESS  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_LESS:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     MOVE.L  WALL_1_Y,    D2         ; Move Enemy Y to D2
     ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
-    CMP.L   D2, D2                ; Check if there's overlap on Y axis
+    CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BLE     Y_GREATER  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_GREATER:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    ADD.L   #PLYR_H_INIT,D1          ; Add Player Height to D1
     MOVE.L  WALL_1_Y,    D2         ; Move Enemy Height to D2  
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BGE     COLLISION  ; If no overlap, skip to next coin
@@ -757,13 +841,13 @@ Y_GREATER:
 CHECK_UP_COLLISIONS:
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_1_UP_X,    D2          ; Move Enemy X to D2
-    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    ADD.L   #WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BLE     X_GREATER_Y  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 X_GREATER_Y:
     MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    ADD.L   #PLYR_W_INIT,D1          ; Move Player Width to D1
     MOVE.L  WALL_1_UP_X,   D2          ; Move Enemy X to D2
     CMP.L   D2, D1                ; Check if there's overlap on X axis
     BGE     Y_LESS_Y  ; If no overlap, skip to next coin
@@ -771,13 +855,13 @@ X_GREATER_Y:
 Y_LESS_Y:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     MOVE.L  WALL_1_UP_Y,    D2         ; Move Enemy Y to D2
-    ADD.L   #90,D2          ; Set Enemy Height to D2
+    ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BLE     Y_GREATER_Y  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_GREATER_Y:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    ADD.L   #PLYR_H_INIT,D1          ; Add Player Height to D1
     MOVE.L  WALL_1_UP_Y,    D2         ; Move Enemy Height to D2  
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BGE     COLLISION  ; If no overlap, skip to next coin
@@ -794,27 +878,27 @@ CHECK_COLLISIONS_2:
     ; PLAYER_H + PLAYER_Y >= COIN_Y
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_2_X,    D2          ; Move Enemy X to D2
-    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    ADD.L   #WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BLE     X_GREATER_2  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 X_GREATER_2:
     MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    ADD.L   #PLYR_W_INIT,D1          ; Move Player Width to D1
     MOVE.L  WALL_2_X,   D2          ; Move Enemy X to D2
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BGE     Y_LESS_2  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_LESS_2:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     MOVE.L  WALL_2_Y,    D2         ; Move Enemy Y to D2
-    ADD.L   #200,D2          ; Set Enemy Height to D2
+    ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BLE     Y_GREATER_2  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_GREATER_2:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    ADD.L   #PLYR_H_INIT,D1          ; Add Player Height to D1
     MOVE.L  WALL_2_Y,    D2         ; Move Enemy Height to D2  
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BGE     COLLISION  ; If no overlap, skip to next coin
@@ -826,13 +910,13 @@ Y_GREATER_2:
 CHECK_UP_COLLISIONS_2:
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_2_UP_X,    D2          ; Move Enemy X to D2
-    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
-    BLE     X_GREATER_Y_2  ; If no overlap, skip to next coin
+    ADD.L   #WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
+    BLE     X_GREATER_X_2  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
-X_GREATER_Y_2:
+X_GREATER_X_2:
     MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    ADD.L   #PLYR_W_INIT,D1          ; Move Player Width to D1
     MOVE.L  WALL_2_UP_X,   D2          ; Move Enemy X to D2
     CMP.L   D2, D1                ; Check if there's overlap on X axis
     BGE     Y_LESS_Y_2  ; If no overlap, skip to next coin
@@ -840,13 +924,13 @@ X_GREATER_Y_2:
 Y_LESS_Y_2:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     MOVE.L  WALL_2_UP_Y,    D2         ; Move Enemy Y to D2
-    ADD.L   #80,D2          ; Set Enemy Height to D2
+    ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BLE     Y_GREATER_Y_2  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_GREATER_Y_2:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    ADD.L   #PLYR_H_INIT,D1          ; Add Player Height to D1
     MOVE.L  WALL_2_UP_Y,    D2         ; Move Enemy Height to D2  
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BGE     COLLISION  ; If no overlap, skip to next coin
@@ -863,27 +947,27 @@ CHECK_COLLISIONS_3:
     ; PLAYER_H + PLAYER_Y >= COIN_Y
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_3_X,    D2          ; Move Enemy X to D2
-    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    ADD.L   #WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D2, D1               ; Check if there's overlap on X axis
     BLE     X_GREATER_3  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 X_GREATER_3:
     MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    ADD.L   #PLYR_W_INIT,D1          ; Move Player Width to D1
     MOVE.L  WALL_3_X,   D2          ; Move Enemy X to D2
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BGE     Y_LESS_3  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_LESS_3:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     MOVE.L  WALL_3_Y,    D2         ; Move Enemy Y to D2
-    ADD.L   #75,D2          ; Set Enemy Height to D2
+    ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BLE     Y_GREATER_3  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_GREATER_3:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    ADD.L   #PLYR_H_INIT,D1          ; Add Player Height to D1
     MOVE.L  WALL_3_Y,    D2         ; Move Enemy Height to D2  
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BGE     COLLISION  ; If no overlap, skip to next coin
@@ -894,13 +978,13 @@ Y_GREATER_3:
 CHECK_UP_COLLISIONS_3:
     MOVE.L  PLAYER_X, D1          ; Move player X to D1
     MOVE.L  WALL_3_UP_X,    D2          ; Move Enemy X to D2
-    ADD.L   WALL_W_INIT,D2          ; Set Enemy width X + Width
-    CMP.L   D1, D2                ; Check if there's overlap on X axis
+    ADD.L   #WALL_W_INIT,D2          ; Set Enemy width X + Width
+    CMP.L   D2, D1                ; Check if there's overlap on X axis
     BLE     X_GREATER_Y_3  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 X_GREATER_Y_3:
     MOVE.L  PLAYER_X,   D1          ; Move Player X to D1
-    ADD.L   PLYR_W_INIT,D1          ; Move Player Width to D1
+    ADD.L   #PLYR_W_INIT,D1          ; Move Player Width to D1
     MOVE.L  WALL_3_UP_X,   D2          ; Move Enemy X to D2
     CMP.L   D2, D1                ; Check if there's overlap on X axis
     BGE     Y_LESS_Y_3  ; If no overlap, skip to next coin
@@ -908,13 +992,13 @@ X_GREATER_Y_3:
 Y_LESS_Y_3:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
     MOVE.L  WALL_3_UP_Y,    D2         ; Move Enemy Y to D2
-    ADD.L   #190,D2          ; Set Enemy Height to D2
+    ADD.L   #WALL_H_INIT,D2          ; Set Enemy Height to D2
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BLE     Y_GREATER_Y_3  ; If no overlap, skip to next coin
     BRA     COLLISION_CHECK_DONE
 Y_GREATER_Y_3:
     MOVE.L  PLAYER_Y,   D1          ; Move Player Y to D1
-    ADD.L   PLYR_H_INIT,D1          ; Add Player Height to D1
+    ADD.L   #PLYR_H_INIT,D1          ; Add Player Height to D1
     MOVE.L  WALL_3_UP_Y,    D2         ; Move Enemy Height to D2  
     CMP.L   D2, D1                ; Check if there's overlap on Y axis
     BGE     COLLISION  ; If no overlap, skip to next coin
@@ -925,9 +1009,27 @@ COLLISION_CHECK_DONE:               ; No Collision Update points
 
 COLLISION:
    BRA INITIALISE
+   RTS
 
+RANDOM_NUMBER:     
+    MOVE.B #8, D0 ;#Loads D1 with Time in 100's of Seconds since midnight (6 Bits)
 
+    TRAP #15  ;#Place time in D1
 
+    AND.L #$5FFFFF, D1 ;# AND 6 Bits to prevent any overflow
+
+    DIVU #300, D1 ;#Divide by 100, 1000, 10000 depending on Number range required
+
+    SWAP D1 #SWAP ;Higher Order Word and Lower Order Word in D1
+
+    ADD.L #150, D1 ; #Add 1 to D1.W so number is at least 1
+
+    MOVE.W D1, D2 ;#Extract the number from D1.W
+
+    CLR.L D1 ; # Clear contents of D1
+
+    MOVE.W D2, D1 ;#Move the generated number to D1
+    RTS
 
 
 
@@ -949,8 +1051,8 @@ EXIT:
 * Description   : Messages to Print on Console, names should be
 * self documenting
 *-----------------------------------------------------------
-SCORE_MSG       DC.B    'METERS : ', 0       ; Score Message
-KEYCODE_MSG     DC.B    'KeyCode : ', 0     ; Keycode Message
+SCORE_MSG       DC.B    'SCORE : ', 0       ; Score Message
+METERS_MSG     DC.B    'METERS : ', 0     ; Keycode Message
 JUMP_MSG        DC.B    'Jump....', 0       ; Jump Message
 
 IDLE_MSG        DC.B    'Idle....', 0       ; Idle Message
@@ -1003,37 +1105,59 @@ CURRENT_KEY     DS.L    01  ; Reserve Space for Current Key Pressed
 PLAYER_X        DS.L    01  ; Reserve Space for Player X Position
 PLAYER_Y        DS.L    01  ; Reserve Space for Player Y Position
 PLAYER_SCORE    DS.L    01  ; Reserve Space for Player Score
-PLAYER_ANGLE    DS.L    01  ;
+PLAYER_METERS   DS.L    01  ; RESERVE FOR METERS
 
 PLYR_VELOCITY   DS.L    01  ; Reserve Space for Player Velocity
 PLYR_GRAVITY    DS.L    01  ; Reserve Space for Player Gravity
 PLYR_ON_GND     DS.L    01  ; Reserve Space for Player on Ground
 PLYR_Y_VEL      DS.L    01
 
+JETPACK_X       DS.L  01 
+JETPACK_Y       DS.L  01
+
+;-----------------------------------------------------------------------------
+;------------------|PLATFORM 1 POS|--------------------------------------------
+;----------------------------------------------------------------------------
 PLAT_1_X        DS.L 01
 PLAT_1_Y        DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|PLATFORM 2 POS|--------------------------------------------
+;----------------------------------------------------------------------------
 PLAT_2_X        DS.L 01
 PLAT_2_Y        DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL 1 POS|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_1_X        DS.L 01
 WALL_1_Y        DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL 1 UPPER POS|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_1_UP_X     DS.L 01
 WALL_1_UP_Y     DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL 2 POS|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_2_X        DS.L 01
 WALL_2_Y        DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL 2 UPPER POS|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_2_UP_X     DS.L 01
 WALL_2_UP_Y     DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL 3 POS|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_3_X        DS.L 01
 WALL_3_Y        DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL 3 UPPER POS|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_3_UP_X     DS.L 01
 WALL_3_UP_Y     DS.L 01
-
+;-----------------------------------------------------------------------------
+;------------------|WALL SPEED|--------------------------------------------
+;----------------------------------------------------------------------------
 WALL_SPEED      DS.L 01
 
 
